@@ -15,157 +15,90 @@ function ddrio.startplugin()
 
     local memory = nil
 
-    local cur_io_offset = 0
-    local text_16seg = TEXT_16SEG_BLANK
 
-    local function twinkle_io_write(offset, data, mask)
-        if offset == 0x1F220000 and mask == 0xFF then
-            if cur_io_offset == 0x37 then
-                local data_masked = data & mask
-                -- Data active low
-                local panel_leds = (~data_masked) & 0x0f
-                
-                iidxio_ep1_set_panel_lights(panel_leds)
-            elseif 
-                cur_io_offset == 0x3F or
-                cur_io_offset == 0x47 or
-                cur_io_offset == 0x4f or
-                cur_io_offset == 0x57 or
-                cur_io_offset == 0x5f or
-                cur_io_offset == 0x67 or
-                cur_io_offset == 0x6f or
-                cur_io_offset == 0x77 or
-                    cur_io_offset == 0x7f then
-                local data_masked = data & mask
-                local char_offset = (cur_io_offset - 0x3f) / 8
-                -- The data provided here is already single byte ASCII
-                local char = (data_masked ~ 0xff) & 0x7f
 
-                -- Make index start at 1 for lua
-                char_offset = char_offset + 1
+    local ksys573_jamma1_state = 0
+    local ksys573_jamma2_state = 0
+    local ksys573_jamma3_state = 0
 
-                -- Handling raw byte data in lua is dumb
-                local bytes = {
-                    string.byte(text_16seg, 1),
-                    string.byte(text_16seg, 2),
-                    string.byte(text_16seg, 3),
-                    string.byte(text_16seg, 4),
-                    string.byte(text_16seg, 5),
-                    string.byte(text_16seg, 6),
-                    string.byte(text_16seg, 7),
-                    string.byte(text_16seg, 8),
-                    string.byte(text_16seg, 9),
-                }
+    -- TODO later (tm)
+    -- local io_state_hdxs_light = 0
+    -- local io_state_hdxs_rgb_light = 0
 
-                bytes[char_offset] = char
-
-                text_16seg = 
-                    string.char(
-                        bytes[1],
-                        bytes[2],
-                        bytes[3],
-                        bytes[4],
-                        bytes[5],
-                        bytes[6],
-                        bytes[7],
-                        bytes[8],
-                        bytes[9],
-                        -- "Safety" null-terminator
-                        0)
-            elseif cur_io_offset == 0x87 then
-                local data_masked = data & mask
-                -- Data active low
-                local top_lamp = (~data_masked) & 0xff
-
-                iidxio_ep1_set_top_lamps(top_lamp)
-            elseif cur_io_offset == 0x8f then
-                local data_masked = data & mask
-                -- Data active low
-                local neons = (~data_masked) & 0x01
-
-                iidxio_ep1_set_top_neons(neons)
-            end
-        elseif offset == 0x1F220000 and mask == 0xFF0000 then
-            local data_masked = (data & mask) >> 16
-
-            cur_io_offset = data_masked
-        end
+    local function ksys573_jamma1_read(offset, data, mask)
+        print(string.format("ksys573_jamma1_read %x %x %x", offset, data, mask))
 
         return data
     end
 
-    local function twinkle_io_read(offset, data, mask)
-        if offset == 0x1f220004 and mask == 0xff then
-            local data_masked = data & mask
-
-            if cur_io_offset == 0x07 then
-                -- Active low inputs
-                data_masked = data_masked ~ 0xff
-
-                local panel = iidxio_ep2_get_panel() & 0x0f
-                -- mast test and service, remove coin input
-                local sys = iidxio_ep2_get_sys() & 0x03
-        
-                data_masked = data_masked | panel | (sys << 4)
-
-                return data_masked ~ 0xff
-            elseif cur_io_offset == 0x0f then
-                local tt_p1 = iidxio_ep2_get_turntable(1) & 0xff
-
-                return tt_p1
-            elseif cur_io_offset == 0x17 then
-                local tt_p2 = iidxio_ep2_get_turntable(0) & 0xff
-
-                return tt_p2
-            elseif cur_io_offset == 0x1f then
-                local slider_1 = iidxio_ep2_get_slider(0) & 0x0f
-                local slider_2 = iidxio_ep2_get_slider(1) & 0x0f
-
-                return slider_1 | (slider_2 << 4)
-            elseif cur_io_offset == 0x27 then
-                local slider_3 = iidxio_ep2_get_slider(2) & 0x0f
-                local slider_4 = iidxio_ep2_get_slider(3) & 0x0f
-
-                return slider_3 | (slider_4 << 4)
-            elseif cur_io_offset == 0x2f then
-
-                local slider_5 = iidxio_ep2_get_slider(4) & 0x0f
-
-                return slider_5
-            end
-        end
+    local function ksys573_jamma2_read(offset, data, mask)
+        print(string.format("ksys573_jamma2_read %x %x %x", offset, data, mask))
 
         return data
     end
 
-    local function twinkle_keys_read(offset, data, mask)
-        if offset == 0x1f240000 and mask == 0xFFFF then
-            local data_masked = data & mask
-            -- Active low inputs
-            data_masked = data_masked ~ 0xFFFF
-
-            local keys = iidxio_ep2_get_keys() & 0x3fff
-            local coin_1 = (iidxio_ep2_get_sys() >> 2) & 0x01
-
-            data_masked = data_masked | keys | (coin_1 << 14)
-
-            return data_masked ~ 0xFFFF
-        end
+    local function ksys573_jamma3_read(offset, data, mask)
+        print(string.format("ksys573_jamma3_read %x %x %x", offset, data, mask))
 
         return data
     end
 
-    local function twinkle_keys_write(offset, data, mask)
-        -- words are written using a byte write -_-" 
-        -- mask = 0xFF but mask data with 0xFFFF
-        if offset == 0x1f250000 and mask == 0xFF then
-            local data_masked = data & 0xFFFF
-            local keys_leds = data_masked & 0x3fff
+    local function ksys573_pad_read(offset, data, mask)
+       
 
-            iidxio_ep1_set_deck_lights(keys_leds)
-        end
 
-        return data
+
+        -- u32 ddrio_stage;
+        -- u32 ddrio_button;
+    
+        -- ddrio_stage = 0;
+        -- ddrio_button = 0;
+    
+        -- ddrio_driver_read_inputs(&ddrio_stage, &ddrio_button);
+    
+        -- u32 stage = (m_ddr_stage_joystick->read() & 0x0f0f) ^ 0x0f0f;
+        -- u32 button = (m_ddr_buttons_joystick->read() & 0xf0f0) ^ 0xf0f0;
+    
+        -- u32 stage_merged = ddrio_stage | stage;
+        -- u32 button_merged = ddrio_button | button;
+    
+        -- stage_merged = stage_merged ^ 0x0f0f;
+        -- button_merged = button_merged ^ 0xf0f0;
+    
+        -- stage_merged &= m_stage_mask;
+    
+        -- return stage_merged | button_merged;
+
+
+        -- PORT_BIT( 0x00000100, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT ) PORT_8WAY PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00000200, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_8WAY PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_JOYSTICK_UP ) PORT_8WAY PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00000800, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN ) PORT_8WAY PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00001000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER( 1 ) /* skip init? */
+        -- PORT_BIT( 0x00002000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00004000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER( 1 )
+        -- PORT_BIT( 0x00008000, IP_ACTIVE_LOW, IPT_START1 ) /* skip init? */
+        -- PORT_BIT( 0x00000001, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT ) PORT_8WAY PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000002, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_8WAY PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000004, IP_ACTIVE_LOW, IPT_JOYSTICK_UP ) PORT_8WAY PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000008, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN ) PORT_8WAY PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER( 2 ) /* skip init? */
+        -- PORT_BIT( 0x00000020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER( 2 )
+        -- PORT_BIT( 0x00000080, IP_ACTIVE_LOW, IPT_START2 ) /* skip init? */
+    end
+
+    local function ksys573_sys_test_read(offset, data, mask)
+        -- PORT_MODIFY( "IN3" )
+        -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_test_read )
+
+    --     const struct ddrio_driver::input_state* input_state = m_ddrio_driver.input_state_front();
+
+	-- bool test = (m_ddr_sys_joystick->read() & 0x02) ^ 0x02;
+
+	-- bool merged = input_state->cabinet_operator.test || test;
+
+	-- return merged ? 1 : 0;
     end
 
     -- Drive the IO synchronously to the frame update rate of the game
@@ -178,22 +111,72 @@ function ddrio.startplugin()
             return
         end
 
-        -- Previous frame outputs
-        if iidxio_ep3_write_16seg(text_16seg) == false then
-            manager.machine:logerror("ERROR iidxio_ep3_write_16seg failed")
-            return
-        end
 
-        if iidxio_ep1_send() == false then
-            manager.machine:logerror("ERROR iidxio_ep1_send failed")
-            return
-        end
+
+        -- Previous frame outputs
+        -- TODO
+        -- ddr_io_lua_set_lights_extio(0)
+        -- ddr_io_lua_set_lights_p3io(0)
 
         -- Next frame inputs
-        if iidxio_ep2_recv() == false then
-            manager.machine:logerror("ERROR iidxio_ep2_recv failed")
-            return
-        end
+        -- local pad = ddr_io_lua_read_pad()
+
+    
+
+
+
+    -- enum ddr_pad_bit {
+    --     DDR_TEST = 0x04,
+    --     DDR_COIN = 0x05,
+    --     DDR_SERVICE = 0x06,
+    
+    --     DDR_P2_START = 0x08,
+    --     DDR_P2_UP = 0x09,
+    --     DDR_P2_DOWN = 0x0A,
+    --     DDR_P2_LEFT = 0x0B,
+    --     DDR_P2_RIGHT = 0x0C,
+    --     DDR_P2_MENU_LEFT = 0x0E,
+    --     DDR_P2_MENU_RIGHT = 0x0F,
+    --     DDR_P2_MENU_UP = 0x02,
+    --     DDR_P2_MENU_DOWN = 0x03,
+    
+    --     DDR_P1_START = 0x10,
+    --     DDR_P1_UP = 0x11,
+    --     DDR_P1_DOWN = 0x12,
+    --     DDR_P1_LEFT = 0x13,
+    --     DDR_P1_RIGHT = 0x14,
+    --     DDR_P1_MENU_LEFT = 0x16,
+    --     DDR_P1_MENU_RIGHT = 0x17,
+    --     DDR_P1_MENU_UP = 0x00,
+    --     DDR_P1_MENU_DOWN = 0x01,
+    -- };
+    local ddrio_state_pad = 0
+
+    -- enum p3io_light_bit {
+    --     LIGHT_P1_MENU = 0x00,
+    --     LIGHT_P2_MENU = 0x01,
+    --     LIGHT_P2_LOWER_LAMP = 0x04,
+    --     LIGHT_P2_UPPER_LAMP = 0x05,
+    --     LIGHT_P1_LOWER_LAMP = 0x06,
+    --     LIGHT_P1_UPPER_LAMP = 0x07,
+    -- };
+    local ddrio_state_p3io_light = 0
+
+    -- enum extio_light_bit {
+    --     LIGHT_NEONS = 0x0E,
+    
+    --     LIGHT_P2_RIGHT = 0x13,
+    --     LIGHT_P2_LEFT = 0x14,
+    --     LIGHT_P2_DOWN = 0x15,
+    --     LIGHT_P2_UP = 0x16,
+    
+    --     LIGHT_P1_RIGHT = 0x1B,
+    --     LIGHT_P1_LEFT = 0x1C,
+    --     LIGHT_P1_DOWN = 0x1D,
+    --     LIGHT_P1_UP = 0x1E
+    -- };
+    local ddrio_state_extio_light = 0
+
     end
 
     local function init()
@@ -204,9 +187,10 @@ function ddrio.startplugin()
 
         -- Heuristic to ensure this plugin only runs with ddr or ds (dancing stage) games
         -- This also blocks the plugin from running when mame is started in "UI mode"
-        if (not string.find(manager.machine.system.name, "ddr")) or (not string.find(manager.machine.system.name, "ds")) then
-            return
-        end
+        -- TODO
+        -- if (not string.find(manager.machine.system.name, "ddr")) or (not string.find(manager.machine.system.name, "ds")) then
+        --     return
+        -- end
 
         local memory = manager.machine.devices[":maincpu"].spaces["program"]
 
@@ -218,9 +202,12 @@ function ddrio.startplugin()
         -- callback_twinkle_keys_read = memory:install_read_tap(0x1f240000, 0x1f240003, "twinkle_keys_read", twinkle_keys_read)
         -- callback_twinkle_keys_write = memory:install_write_tap(0x1f250000, 0x1f250003, "twinkle_keys_write", twinkle_keys_write)
 
-        memory:install_read_tap(0x1f400004, 0x1f400007, "ksys573_service_coin_read", ksys573_service_coin_read)
-        memory:install_read_tap(0x1f400008, 0x1f40000b, "ksys573_pad_read", ksys573_pad_read)
-        memory:install_read_tap(0x1f40000c, 0x1f40000f, "ksys573_sys_test_read", ksys573_sys_test_read)
+        print("installed hooks")
+
+        -- Leave out 0x1f400000 to 0x1f400003 which is jamma0 which are not used
+        -- memory:install_read_tap(0x1f400004, 0x1f400007, "ksys573_jamma1_read", ksys573_jamma1_read)
+        memory:install_read_tap(0x1f400008, 0x1f40000b, "ksys573_jamma2_read", ksys573_jamma2_read)
+        -- memory:install_read_tap(0x1f40000c, 0x1f40000f, "ksys573_jamma3_read", ksys573_jamma3_read)
 
 
         -- TODO outputs mapped on digital io board
@@ -251,21 +238,21 @@ function ddrio.startplugin()
         -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_test_read )
 
         -- Loads native ddrio lua bindings c-library with ddrio bemanitools API glue code
-        require("ddrio_lua_bind")
+        -- require("ddrio_lua_bind")
 
-        if ddr_io_lua_init() == false then
-            manager.machine:logerror("ERROR initializing ddrio backend")
-            return
-        end
+        -- if ddr_io_lua_init() == false then
+        --     manager.machine:logerror("ERROR initializing ddrio backend")
+        --     return
+        -- end
 
         -- Switch everything off and read inputs once to avoid random (input) noise
-        ddr_io_lua_set_lights_extio(0)
-        ddr_io_lua_set_lights_p3io(0)
-        ddr_io_lua_set_lights_hdxs_panel(0)
+        -- ddr_io_lua_set_lights_extio(0)
+        -- ddr_io_lua_set_lights_p3io(0)
+        -- ddr_io_lua_set_lights_hdxs_panel(0)
 
-        for i = 0, 0x0b, 1 do
-            ddr_io_lua_set_lights_hdxs_rgb(i, 0, 0, 0)
-        end
+        -- for i = 0, 0x0b, 1 do
+        --     ddr_io_lua_set_lights_hdxs_rgb(i, 0, 0, 0)
+        -- end
 
         is_initialized = true
 
@@ -296,6 +283,8 @@ function ddrio.startplugin()
     ---------------------------------------------------------------------------
     -- Main
     ---------------------------------------------------------------------------
+
+    print(">>> ddrio plugin")
 
     emu.register_start(init)
     emu.register_stop(deinit)
