@@ -15,90 +15,153 @@ function ddrio.startplugin()
 
     local memory = nil
 
+    local CABINET_TEST_MASK = (1 << 10)
+    local CABINET_SERVICE_MASK = (1 << 0)
+    local CABINET_COIN_MASK = (1 << 0)
 
+    local STAGE_P1_UP_MASK = (1 << 10)
+    local STAGE_P1_DOWN_MASK = (1 << 11)
+    local STAGE_P1_LEFT_MASK = (1 << 8)
+    local STAGE_P1_RIGHT_MASK = (1 << 9)
 
-    local ksys573_jamma1_state = 0
-    local ksys573_jamma2_state = 0
-    local ksys573_jamma3_state = 0
+    local STAGE_P2_UP_MASK = (1 << 2)
+    local STAGE_P2_DOWN_MASK = (1 << 3)
+    local STAGE_P2_LEFT_MASK = (1 << 0)
+    local STAGE_P2_RIGHT_MASK = (1 << 1)
 
-    -- TODO later (tm)
-    -- local io_state_hdxs_light = 0
-    -- local io_state_hdxs_rgb_light = 0
+    local CABINET_P1_LEFT_MASK = (1 << 13)
+    local CABINET_P1_RIGHT_MASK = (1 << 14)
+    local CABINET_P1_START_MASK = (1 << 15)
+
+    local CABINET_P2_LEFT_MASK = (1 << 5)
+    local CABINET_P2_RIGHT_MASK = (1 << 6) 
+    local CABINET_P2_START_MASK = (1 << 7)
+
+    local DDRIO_TEST_MASK = (1 << 4)
+    local DDRIO_COIN_MASK = (1 << 5)
+    local DDRIO_SERVICE_MASK = (1 << 6)
+
+    local DDRIO_P1_UP_MASK = (1 << 17)
+    local DDRIO_P1_DOWN_MASK = (1 << 18)
+    local DDRIO_P1_LEFT_MASK = (1 << 19)
+    local DDRIO_P1_RIGHT_MASK = (1 << 20)
+
+    local DDRIO_P2_UP_MASK = (1 << 9)
+    local DDRIO_P2_DOWN_MASK = (1 << 10)
+    local DDRIO_P2_LEFT_MASK = (1 << 11)
+    local DDRIO_P2_RIGHT_MASK = (1 << 12)
+
+    local DDRIO_P1_START_MASK = (1 << 16)
+    local DDRIO_P1_MENU_LEFT_MASK = (1 << 22)
+    local DDRIO_P1_MENU_RIGHT_MASK = (1 << 23)
+
+    local DDRIO_P2_START_MASK = (1 << 8)
+    local DDRIO_P2_MENU_LEFT_MASK = (1 << 14)
+    local DDRIO_P2_MENU_RIGHT_MASK = (1 << 15)
+
+    local ddrio_state_pad = 0
+    local ddrio_state_p3io_light = 0
+    local ddrio_state_extio_light = 0
 
     local function ksys573_jamma1_read(offset, data, mask)
-        print(string.format("ksys573_jamma1_read %x %x %x", offset, data, mask))
+        -- print(string.format("ksys573_jamma1_read %x %x %x", offset, data, mask))
 
-        return data
+        return
     end
 
     local function ksys573_jamma2_read(offset, data, mask)
-        print(string.format("ksys573_jamma2_read %x %x %x", offset, data, mask))
+        if offset == 0x1f400008 and mask == 0xffff then
+            local data_stage = 0
+            local data_button = 0
 
-        return data
+            if ddrio_state_pad & DDRIO_P1_UP_MASK > 0 then
+                data_stage = data_stage | STAGE_P1_UP_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_DOWN_MASK > 0 then
+                data_stage = data_stage | STAGE_P1_DOWN_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_LEFT_MASK > 0 then
+                data_stage = data_stage | STAGE_P1_LEFT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_RIGHT_MASK > 0 then
+                data_stage = data_stage | STAGE_P1_RIGHT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_UP_MASK > 0 then
+                data_stage = data_stage | STAGE_P2_UP_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_DOWN_MASK > 0 then
+                data_stage = data_stage | STAGE_P2_DOWN_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_LEFT_MASK > 0 then
+                data_stage = data_stage | STAGE_P2_LEFT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_RIGHT_MASK > 0 then
+                data_stage = data_stage | STAGE_P2_RIGHT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_START_MASK > 0 then
+                data_button = data_button | CABINET_P1_START_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_MENU_LEFT_MASK > 0 then
+                data_button = data_button | CABINET_P1_LEFT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P1_MENU_RIGHT_MASK > 0 then
+                data_button = data_button | CABINET_P1_RIGHT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_START_MASK > 0 then
+                data_button = data_button | CABINET_P2_START_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_MENU_LEFT_MASK > 0 then
+                data_button = data_button | CABINET_P2_LEFT_MASK
+            end
+
+            if ddrio_state_pad & DDRIO_P2_MENU_RIGHT_MASK > 0 then
+                data_button = data_button | CABINET_P2_RIGHT_MASK
+            end
+
+            -- TODO apply stage mask here based on what the digital IO reports regarding which
+            -- sensor group is selected
+
+            -- Inputs are active low, invert
+            data_stage = (data_stage & 0x0f0f) ~ 0x0f0f;
+            data_button = (data_button & 0xf0f0) ~ 0xf0f0;
+
+            return (data_stage | data_button) & mask
+        end
+
+        return
     end
 
     local function ksys573_jamma3_read(offset, data, mask)
-        print(string.format("ksys573_jamma3_read %x %x %x", offset, data, mask))
+        if offset == 0x1f40000c and mask == 0xffff then
+            local data_button = 0
 
-        return data
-    end
+            if ddrio_state_pad & DDRIO_TEST_MASK > 0 then
+                data_button = data_button | CABINET_TEST_MASK
+            end
 
-    local function ksys573_pad_read(offset, data, mask)
-       
+            -- Input is active low
+            data = data | data_button
 
+            -- TODO continue here, test button not working, yet
 
+            print(string.format(">> %x %x", data, data_button))
 
-        -- u32 ddrio_stage;
-        -- u32 ddrio_button;
-    
-        -- ddrio_stage = 0;
-        -- ddrio_button = 0;
-    
-        -- ddrio_driver_read_inputs(&ddrio_stage, &ddrio_button);
-    
-        -- u32 stage = (m_ddr_stage_joystick->read() & 0x0f0f) ^ 0x0f0f;
-        -- u32 button = (m_ddr_buttons_joystick->read() & 0xf0f0) ^ 0xf0f0;
-    
-        -- u32 stage_merged = ddrio_stage | stage;
-        -- u32 button_merged = ddrio_button | button;
-    
-        -- stage_merged = stage_merged ^ 0x0f0f;
-        -- button_merged = button_merged ^ 0xf0f0;
-    
-        -- stage_merged &= m_stage_mask;
-    
-        -- return stage_merged | button_merged;
+            return data
+        end
 
-
-        -- PORT_BIT( 0x00000100, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT ) PORT_8WAY PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00000200, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_8WAY PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_JOYSTICK_UP ) PORT_8WAY PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00000800, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN ) PORT_8WAY PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00001000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER( 1 ) /* skip init? */
-        -- PORT_BIT( 0x00002000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00004000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER( 1 )
-        -- PORT_BIT( 0x00008000, IP_ACTIVE_LOW, IPT_START1 ) /* skip init? */
-        -- PORT_BIT( 0x00000001, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT ) PORT_8WAY PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000002, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_8WAY PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000004, IP_ACTIVE_LOW, IPT_JOYSTICK_UP ) PORT_8WAY PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000008, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN ) PORT_8WAY PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER( 2 ) /* skip init? */
-        -- PORT_BIT( 0x00000020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER( 2 )
-        -- PORT_BIT( 0x00000080, IP_ACTIVE_LOW, IPT_START2 ) /* skip init? */
-    end
-
-    local function ksys573_sys_test_read(offset, data, mask)
-        -- PORT_MODIFY( "IN3" )
-        -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_test_read )
-
-    --     const struct ddrio_driver::input_state* input_state = m_ddrio_driver.input_state_front();
-
-	-- bool test = (m_ddr_sys_joystick->read() & 0x02) ^ 0x02;
-
-	-- bool merged = input_state->cabinet_operator.test || test;
-
-	-- return merged ? 1 : 0;
+        return
     end
 
     -- Drive the IO synchronously to the frame update rate of the game
@@ -111,72 +174,19 @@ function ddrio.startplugin()
             return
         end
 
-
-
         -- Previous frame outputs
         -- TODO
-        -- ddr_io_lua_set_lights_extio(0)
-        -- ddr_io_lua_set_lights_p3io(0)
+        ddr_io_set_lights_extio(0)
+        ddr_io_set_lights_p3io(0)
+
+        -- TODO
+        ddrio_state_p3io_light = 0
+        ddrio_state_extio_light = 0
 
         -- Next frame inputs
-        -- local pad = ddr_io_lua_read_pad()
+        ddrio_state_pad = ddr_io_read_pad()
 
-    
-
-
-
-    -- enum ddr_pad_bit {
-    --     DDR_TEST = 0x04,
-    --     DDR_COIN = 0x05,
-    --     DDR_SERVICE = 0x06,
-    
-    --     DDR_P2_START = 0x08,
-    --     DDR_P2_UP = 0x09,
-    --     DDR_P2_DOWN = 0x0A,
-    --     DDR_P2_LEFT = 0x0B,
-    --     DDR_P2_RIGHT = 0x0C,
-    --     DDR_P2_MENU_LEFT = 0x0E,
-    --     DDR_P2_MENU_RIGHT = 0x0F,
-    --     DDR_P2_MENU_UP = 0x02,
-    --     DDR_P2_MENU_DOWN = 0x03,
-    
-    --     DDR_P1_START = 0x10,
-    --     DDR_P1_UP = 0x11,
-    --     DDR_P1_DOWN = 0x12,
-    --     DDR_P1_LEFT = 0x13,
-    --     DDR_P1_RIGHT = 0x14,
-    --     DDR_P1_MENU_LEFT = 0x16,
-    --     DDR_P1_MENU_RIGHT = 0x17,
-    --     DDR_P1_MENU_UP = 0x00,
-    --     DDR_P1_MENU_DOWN = 0x01,
-    -- };
-    local ddrio_state_pad = 0
-
-    -- enum p3io_light_bit {
-    --     LIGHT_P1_MENU = 0x00,
-    --     LIGHT_P2_MENU = 0x01,
-    --     LIGHT_P2_LOWER_LAMP = 0x04,
-    --     LIGHT_P2_UPPER_LAMP = 0x05,
-    --     LIGHT_P1_LOWER_LAMP = 0x06,
-    --     LIGHT_P1_UPPER_LAMP = 0x07,
-    -- };
-    local ddrio_state_p3io_light = 0
-
-    -- enum extio_light_bit {
-    --     LIGHT_NEONS = 0x0E,
-    
-    --     LIGHT_P2_RIGHT = 0x13,
-    --     LIGHT_P2_LEFT = 0x14,
-    --     LIGHT_P2_DOWN = 0x15,
-    --     LIGHT_P2_UP = 0x16,
-    
-    --     LIGHT_P1_RIGHT = 0x1B,
-    --     LIGHT_P1_LEFT = 0x1C,
-    --     LIGHT_P1_DOWN = 0x1D,
-    --     LIGHT_P1_UP = 0x1E
-    -- };
-    local ddrio_state_extio_light = 0
-
+        return
     end
 
     local function init()
@@ -194,20 +204,33 @@ function ddrio.startplugin()
 
         local memory = manager.machine.devices[":maincpu"].spaces["program"]
 
+
+        -- map(0x1f400000, 0x1f400003).portr("IN0").portw("OUT0");
+        -- map(0x1f400004, 0x1f400007).portr("IN1");
+        -- map(0x1f400008, 0x1f40000b).portr("IN2");
+        -- map(0x1f40000c, 0x1f40000f).portr("IN3");
+
+
+        -- PORT_MODIFY( "IN1" )
+        -- PORT_BIT( 0x10000000, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_service_read )
+        -- PORT_BIT( 0x01000000, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_coin1_read )
+        -- PORT_BIT( 0x02000000, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_coin2_read )
+    
+        -- PORT_MODIFY( "IN2" )
+        -- PORT_BIT( 0x0000ffff, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_CUSTOM_MEMBER( ksys573_state, ddrio_inputs_pad_read )
+    
+        -- PORT_MODIFY( "IN3" )
+        -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_test_read )
+
         -- Tap into relevant IO regions for dispatching data reads and writes to those data areas
         -- Key reference for callback functions registered here:
-        -- https://github.com/mamedev/mame/blob/9dbf099b651c8c48140db01059614e23d5bbdcb9/src/mame/konami/twinkle.cpp
-        -- callback_twinkle_io_write = memory:install_write_tap(0x1f220000, 0x1f220003, "twinkle_io_write", twinkle_io_write)
-        -- callback_twinkle_io_read = memory:install_read_tap(0x1f220004, 0x1f220007, "twinkle_io_read", twinkle_io_read)
-        -- callback_twinkle_keys_read = memory:install_read_tap(0x1f240000, 0x1f240003, "twinkle_keys_read", twinkle_keys_read)
-        -- callback_twinkle_keys_write = memory:install_write_tap(0x1f250000, 0x1f250003, "twinkle_keys_write", twinkle_keys_write)
-
-        print("installed hooks")
+        -- https://github.com/mamedev/mame/blob/9dbf099b651c8c48140db01059614e23d5bbdcb9/src/mame/konami/ksys573.cpp
 
         -- Leave out 0x1f400000 to 0x1f400003 which is jamma0 which are not used
         -- memory:install_read_tap(0x1f400004, 0x1f400007, "ksys573_jamma1_read", ksys573_jamma1_read)
+        -- TODO assign return value and do the if-then-else foo, see iidxio
         memory:install_read_tap(0x1f400008, 0x1f40000b, "ksys573_jamma2_read", ksys573_jamma2_read)
-        -- memory:install_read_tap(0x1f40000c, 0x1f40000f, "ksys573_jamma3_read", ksys573_jamma3_read)
+        memory:install_read_tap(0x1f40000c, 0x1f40000f, "ksys573_jamma3_read", ksys573_jamma3_read)
 
 
         -- TODO outputs mapped on digital io board
@@ -238,25 +261,27 @@ function ddrio.startplugin()
         -- PORT_BIT( 0x00000400, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_MEMBER( ksys573_state, ddrio_inputs_sys_test_read )
 
         -- Loads native ddrio lua bindings c-library with ddrio bemanitools API glue code
-        -- require("ddrio_lua_bind")
+        require("ddrio_lua_bind")
 
-        -- if ddr_io_lua_init() == false then
-        --     manager.machine:logerror("ERROR initializing ddrio backend")
-        --     return
-        -- end
+        if ddr_io_init() == false then
+            manager.machine:logerror("ERROR initializing ddrio backend")
+            return
+        end
 
         -- Switch everything off and read inputs once to avoid random (input) noise
-        -- ddr_io_lua_set_lights_extio(0)
-        -- ddr_io_lua_set_lights_p3io(0)
-        -- ddr_io_lua_set_lights_hdxs_panel(0)
+        ddr_io_set_lights_extio(0)
+        ddr_io_set_lights_p3io(0)
+        ddr_io_set_lights_hdxs_panel(0)
 
-        -- for i = 0, 0x0b, 1 do
-        --     ddr_io_lua_set_lights_hdxs_rgb(i, 0, 0, 0)
-        -- end
+        for i = 0, 0x0b, 1 do
+            ddr_io_set_lights_hdxs_rgb(i, 0, 0, 0)
+        end
 
         is_initialized = true
 
         frame_update()
+
+        manager.machine:logerror("ddrio plugin initialized")
     end
 
     local function deinit()
@@ -265,12 +290,12 @@ function ddrio.startplugin()
         end
 
         -- Switch everything off
-        ddr_io_lua_set_lights_extio(0)
-        ddr_io_lua_set_lights_p3io(0)
-        ddr_io_lua_set_lights_hdxs_panel(0)
+        ddr_io_set_lights_extio(0)
+        ddr_io_set_lights_p3io(0)
+        ddr_io_set_lights_hdxs_panel(0)
 
         for i = 0, 0x0b, 1 do
-            ddr_io_lua_set_lights_hdxs_rgb(i, 0, 0, 0)
+            ddr_io_set_lights_hdxs_rgb(i, 0, 0, 0)
         end
 
         frame_update()
@@ -278,13 +303,13 @@ function ddrio.startplugin()
         ddrio_fini()
 
         is_initialized = false
+
+        manager.machine:logerror("ddrio plugin de-initialized")
     end
 
     ---------------------------------------------------------------------------
     -- Main
     ---------------------------------------------------------------------------
-
-    print(">>> ddrio plugin")
 
     emu.register_start(init)
     emu.register_stop(deinit)
