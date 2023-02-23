@@ -63,6 +63,8 @@ function ddrio.startplugin()
     local ddrio_state_p3io_light = 0
     local ddrio_state_extio_light = 0
 
+    local ksys573_dio_write_output_data = {0, 0, 0, 0, 0, 0, 0, 0}
+
     local function ksys573_jamma1_read(offset, data, mask)
         -- print(string.format("ksys573_jamma1_read %x %x %x", offset, data, mask))
 
@@ -137,7 +139,14 @@ function ddrio.startplugin()
             data_stage = (data_stage & 0x0f0f) ~ 0x0f0f;
             data_button = (data_button & 0xf0f0) ~ 0xf0f0;
 
-            return (data_stage | data_button) & mask
+            -- TODO, this seems to be required as the mask changes with the different states
+            -- the stage IO goes into during boot and gameplay
+            -- if the right masking is not applied correclty, boot gets stuck with a stage IO error
+	        --data_stage &= m_stage_mask;
+
+            -- TODO this causes the stage pcb error right now
+            -- return (data_stage | data_button) & mask
+            return data & mask
         end
 
         return
@@ -152,16 +161,71 @@ function ddrio.startplugin()
             end
 
             -- Input is active low
-            data = data | data_button
+            data = data | (data_button & CABINET_TEST_MASK)
 
             -- TODO continue here, test button not working, yet
 
             print(string.format(">> %x %x", data, data_button))
 
-            return data
+            return data & mask
         end
 
         return
+    end
+
+    local function ksys573_dio_write_1(offset, data, mask)
+        ksys573_dio_write_output(1, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_0(offset, data, mask)
+        ksys573_dio_write_output(0, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_3(offset, data, mask)
+        ksys573_dio_write_output(3, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_7(offset, data, mask)
+        ksys573_dio_write_output(7, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_4(offset, data, mask)
+        ksys573_dio_write_output(4, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_5(offset, data, mask)
+        ksys573_dio_write_output(5, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_2(offset, data, mask)
+        ksys573_dio_write_output(2, data & 0xffff)
+        return
+    end
+
+    local function ksys573_dio_write_output(offset, data)
+        data = (data >> 12) & 0x0f
+        local shift = { 0, 2, 3, 1 }
+
+        for i = 0, 4 do
+            local oldbit = (ksys573_dio_write_output_data[offset] >> shift[i]) & 1
+            local newbit = (data >> shift[i]) & 1
+        
+            if not (oldbit == newbit) then
+                ksys573_dio_write_output_dispatch(4 * offset + i, newbit & 0xff)
+            end
+        end
+
+        ksys573_dio_write_output_data[offset] = data;
+    end
+
+    local function ksys573_dio_write_output_dispatch(offset, data)
+        print(string.format("output: %x %x", offset, data))
     end
 
     -- Drive the IO synchronously to the frame update rate of the game
@@ -232,18 +296,17 @@ function ddrio.startplugin()
         memory:install_read_tap(0x1f400008, 0x1f40000b, "ksys573_jamma2_read", ksys573_jamma2_read)
         memory:install_read_tap(0x1f40000c, 0x1f40000f, "ksys573_jamma3_read", ksys573_jamma3_read)
 
+        -- Outputs from digital IO, stage PCB and lights data
+        -- Mame lua API requires to read 4 bytes even we only need the first two bytes
+        memory:install_read_tap(0x1f6400e0, 0x1f6400e3, "ksys573_dio_write_1", ksys573_dio_write_1)
+        memory:install_read_tap(0x1f6400e2, 0x1f6400e5, "ksys573_dio_write_0", ksys573_dio_write_0)
+        memory:install_read_tap(0x1f6400e4, 0x1f6400e7, "ksys573_dio_write_3", ksys573_dio_write_3)
+        memory:install_read_tap(0x1f6400e6, 0x1f6400e9, "ksys573_dio_write_7", ksys573_dio_write_7)
+        memory:install_read_tap(0x1f6400fa, 0x1f6400fd, "ksys573_dio_write_4", ksys573_dio_write_4)
+        memory:install_read_tap(0x1f6400fc, 0x1f6400ff, "ksys573_dio_write_5", ksys573_dio_write_5)
+        memory:install_read_tap(0x1f6400fe, 0x1f640101, "ksys573_dio_write_2", ksys573_dio_write_2)
 
-        -- TODO outputs mapped on digital io board
 
-        -- TODO add the base 0x1f640000 to the dio addresses to get the absolute memory address
-
-        -- map(0xe0, 0xe1).w(FUNC(k573dio_device::output_1_w));
-        -- map(0xe2, 0xe3).w(FUNC(k573dio_device::output_0_w));
-        -- map(0xe4, 0xe5).w(FUNC(k573dio_device::output_3_w));
-        -- map(0xe6, 0xe7).w(FUNC(k573dio_device::output_7_w));
-        -- map(0xfa, 0xfb).w(FUNC(k573dio_device::output_4_w));
-        -- map(0xfc, 0xfd).w(FUNC(k573dio_device::output_5_w));
-        -- map(0xfe, 0xff).w(FUNC(k573dio_device::output_2_w));
 
         -- map(0x1f400004, 0x1f400007).portr("IN1");
         -- map(0x1f400008, 0x1f40000b).portr("IN2");
@@ -276,6 +339,12 @@ function ddrio.startplugin()
         for i = 0, 0x0b, 1 do
             ddr_io_set_lights_hdxs_rgb(i, 0, 0, 0)
         end
+
+        ddrio_state_pad = 0
+        ddrio_state_p3io_light = 0
+        ddrio_state_extio_light = 0
+    
+        ksys573_dio_write_output_data = {0, 0, 0, 0, 0, 0, 0, 0}
 
         is_initialized = true
 
