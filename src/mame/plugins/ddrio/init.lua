@@ -165,7 +165,7 @@ function ddrio.startplugin()
 
             -- TODO continue here, test button not working, yet
 
-            print(string.format(">> %x %x", data, data_button))
+            -- print(string.format(">> %x %x", data, data_button))
 
             return data & mask
         end
@@ -173,42 +173,58 @@ function ddrio.startplugin()
         return
     end
 
-    local function ksys573_dio_write_1(offset, data, mask)
-        ksys573_dio_write_output(1, data & 0xffff)
-        return
+    -- memory:install_read_tap(0x1f6400e0, 0x1f6400e3, "ksys573_dio_write_1", ksys573_dio_write_1)
+    -- memory:install_read_tap(0x1f6400e2, 0x1f6400e5, "ksys573_dio_write_0", ksys573_dio_write_0)
+
+    local function ksys573_dio_write_1_0(offset, data, mask)
+        print(string.format("!!! %x %x %x", offset, data, mask))
+
+        if offset == 0x1f6400e0 then
+            if mask == 0xffff then
+                ksys573_dio_write_output(1, data & 0xffff)
+            elseif mask == 0xffff0000 then
+                ksys573_dio_write_output(0, (data >> 16) & 0xffff)
+            end
+        end
     end
 
-    local function ksys573_dio_write_0(offset, data, mask)
-        ksys573_dio_write_output(0, data & 0xffff)
-        return
-    end
+    local function ksys573_dio_write_3_7(offset, data, mask)
+        print(string.format("!!! %x %x %x", offset, data, mask))
 
-    local function ksys573_dio_write_3(offset, data, mask)
-        ksys573_dio_write_output(3, data & 0xffff)
-        return
-    end
-
-    local function ksys573_dio_write_7(offset, data, mask)
-        ksys573_dio_write_output(7, data & 0xffff)
-        return
+        if offset == 0x1f6400e4 then
+            if mask == 0xffff then
+                ksys573_dio_write_output(3, data & 0xffff)
+            elseif mask == 0xffff0000 then
+                ksys573_dio_write_output(7, (data >> 16) & 0xffff)
+            end
+        end
     end
 
     local function ksys573_dio_write_4(offset, data, mask)
-        ksys573_dio_write_output(4, data & 0xffff)
-        return
+        print(string.format("!!! %x %x %x", offset, data, mask))
+
+        if offset == 0x1f6400f8 then
+            if mask == 0xffff0000 then
+                ksys573_dio_write_output(4, (data >> 16) & 0xffff)
+            end
+        end
     end
 
-    local function ksys573_dio_write_5(offset, data, mask)
-        ksys573_dio_write_output(5, data & 0xffff)
-        return
-    end
+    local function ksys573_dio_write_5_2(offset, data, mask)
+        print(string.format("!!! %x %x %x", offset, data, mask))
 
-    local function ksys573_dio_write_2(offset, data, mask)
-        ksys573_dio_write_output(2, data & 0xffff)
-        return
+        if offset == 0x1f6400fc then
+            if mask == 0xffff then
+                ksys573_dio_write_output(5, data & 0xffff)
+            elseif mask == 0xffff0000 then
+                ksys573_dio_write_output(2, (data >> 16) & 0xffff)
+            end
+        end
     end
 
     local function ksys573_dio_write_output(offset, data)
+        print(string.format(">>> %x %x", offset, data))
+
         data = (data >> 12) & 0x0f
         local shift = { 0, 2, 3, 1 }
 
@@ -298,14 +314,11 @@ function ddrio.startplugin()
 
         -- Outputs from digital IO, stage PCB and lights data
         -- Mame lua API requires to read 4 bytes even we only need the first two bytes
-        memory:install_read_tap(0x1f6400e0, 0x1f6400e3, "ksys573_dio_write_1", ksys573_dio_write_1)
-        memory:install_read_tap(0x1f6400e2, 0x1f6400e5, "ksys573_dio_write_0", ksys573_dio_write_0)
-        memory:install_read_tap(0x1f6400e4, 0x1f6400e7, "ksys573_dio_write_3", ksys573_dio_write_3)
-        memory:install_read_tap(0x1f6400e6, 0x1f6400e9, "ksys573_dio_write_7", ksys573_dio_write_7)
-        memory:install_read_tap(0x1f6400fa, 0x1f6400fd, "ksys573_dio_write_4", ksys573_dio_write_4)
-        memory:install_read_tap(0x1f6400fc, 0x1f6400ff, "ksys573_dio_write_5", ksys573_dio_write_5)
-        memory:install_read_tap(0x1f6400fe, 0x1f640101, "ksys573_dio_write_2", ksys573_dio_write_2)
 
+        memory:install_write_tap(0x1f6400e0, 0x1f6400e3, "ksys573_dio_write_1_0", ksys573_dio_write_1_0)
+        memory:install_write_tap(0x1f6400e4, 0x1f6400e7, "ksys573_dio_write_3_7", ksys573_dio_write_3_7)
+        memory:install_write_tap(0x1f6400f8, 0x1f6400fb, "ksys573_dio_write_4", ksys573_dio_write_4)
+        memory:install_write_tap(0x1f6400fc, 0x1f6400ff, "ksys573_dio_write_5_2", ksys573_dio_write_5_2)
 
 
         -- map(0x1f400004, 0x1f400007).portr("IN1");
