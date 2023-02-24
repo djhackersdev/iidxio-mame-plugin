@@ -176,9 +176,47 @@ function ddrio.startplugin()
     -- memory:install_read_tap(0x1f6400e0, 0x1f6400e3, "ksys573_dio_write_1", ksys573_dio_write_1)
     -- memory:install_read_tap(0x1f6400e2, 0x1f6400e5, "ksys573_dio_write_0", ksys573_dio_write_0)
 
-    local function ksys573_dio_write_1_0(offset, data, mask)
-        print(string.format("!!! %x %x %x", offset, data, mask))
+    local function ksys573_dio_write_output_dispatch(offset, data)
+        print(string.format("output: %x %x", offset, data))
+    end
 
+    local function ksys573_dio_write_output(offset, data)
+        print(string.format(">>> %x %x", offset, data))
+
+        data = (data >> 12) & 0x0f
+        local shift = { 0, 2, 3, 1 }
+
+        for i = 0, 3, 1 do
+            print(string.format("### %d", i))
+            print(string.format("%d", ksys573_dio_write_output_data[offset]))
+            print(string.format("%d", shift[i])) -- TODO this breaks because of index starting with 1 in lua
+            -- local asbd = ksys573_dio_write_output_data[offset]
+            -- local djdj = shift[i]
+            -- shift[i]
+            local oldbit = (ksys573_dio_write_output_data[offset] >> shift[i]) & 1
+            -- local newbit = (data >> shift[i]) & 1
+        
+            -- if not (oldbit == newbit) then
+            --     ksys573_dio_write_output_dispatch(4 * offset + i, newbit & 0xff)
+            -- end
+        end
+
+        ksys573_dio_write_output_data[offset] = data;
+
+
+        -- data = (data >> 12) & 0x0f;
+        -- static const int shift[] = { 0, 2, 3, 1 };
+
+        -- for(int i = 0; i < 4; i++) {
+        --     int oldbit = (output_data[offset] >> shift[i]) & 1;
+        --     int newbit = (data                >> shift[i]) & 1;
+        --     if(oldbit != newbit)
+        --         output_cb(4*offset + i, newbit, 0xff);
+        -- }
+        -- output_data[offset] = data;
+    end
+
+    local function ksys573_dio_write_1_0(offset, data, mask)
         if offset == 0x1f6400e0 then
             if mask == 0xffff then
                 ksys573_dio_write_output(1, data & 0xffff)
@@ -189,8 +227,6 @@ function ddrio.startplugin()
     end
 
     local function ksys573_dio_write_3_7(offset, data, mask)
-        print(string.format("!!! %x %x %x", offset, data, mask))
-
         if offset == 0x1f6400e4 then
             if mask == 0xffff then
                 ksys573_dio_write_output(3, data & 0xffff)
@@ -201,8 +237,6 @@ function ddrio.startplugin()
     end
 
     local function ksys573_dio_write_4(offset, data, mask)
-        print(string.format("!!! %x %x %x", offset, data, mask))
-
         if offset == 0x1f6400f8 then
             if mask == 0xffff0000 then
                 ksys573_dio_write_output(4, (data >> 16) & 0xffff)
@@ -211,8 +245,6 @@ function ddrio.startplugin()
     end
 
     local function ksys573_dio_write_5_2(offset, data, mask)
-        print(string.format("!!! %x %x %x", offset, data, mask))
-
         if offset == 0x1f6400fc then
             if mask == 0xffff then
                 ksys573_dio_write_output(5, data & 0xffff)
@@ -220,28 +252,6 @@ function ddrio.startplugin()
                 ksys573_dio_write_output(2, (data >> 16) & 0xffff)
             end
         end
-    end
-
-    local function ksys573_dio_write_output(offset, data)
-        print(string.format(">>> %x %x", offset, data))
-
-        data = (data >> 12) & 0x0f
-        local shift = { 0, 2, 3, 1 }
-
-        for i = 0, 4 do
-            local oldbit = (ksys573_dio_write_output_data[offset] >> shift[i]) & 1
-            local newbit = (data >> shift[i]) & 1
-        
-            if not (oldbit == newbit) then
-                ksys573_dio_write_output_dispatch(4 * offset + i, newbit & 0xff)
-            end
-        end
-
-        ksys573_dio_write_output_data[offset] = data;
-    end
-
-    local function ksys573_dio_write_output_dispatch(offset, data)
-        print(string.format("output: %x %x", offset, data))
     end
 
     -- Drive the IO synchronously to the frame update rate of the game
